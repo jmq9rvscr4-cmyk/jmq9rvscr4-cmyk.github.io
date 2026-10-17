@@ -1,0 +1,39 @@
+name: Register Tesla Fleet API
+
+on:
+  workflow_dispatch:
+
+jobs:
+  register:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get Partner token and register application
+        env:
+          CLIENT_ID: ${{ secrets.TESLA_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.TESLA_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+
+          RESPONSE=$(curl -sS --fail-with-body \
+            --request POST \
+            --header 'Content-Type: application/x-www-form-urlencoded' \
+            --data-urlencode 'grant_type=client_credentials' \
+            --data-urlencode "client_id=$CLIENT_ID" \
+            --data-urlencode "client_secret=$CLIENT_SECRET" \
+            --data-urlencode 'audience=https://fleet-api.prd.na.vn.cloud.tesla.com' \
+            'https://fleet-auth.prd.vn.cloud.tesla.com/oauth2/v3/token')
+
+          TOKEN=$(printf '%s' "$RESPONSE" | jq -r '.access_token // empty')
+
+          if [ -z "$TOKEN" ]; then
+            echo "Partner token request failed."
+            exit 1
+          fi
+
+          curl -sS --fail-with-body \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --header "Authorization: Bearer $TOKEN" \
+            --data '{"domain":"jmcintyre.me"}' \
+            'https://fleet-api.prd.na.vn.cloud.tesla.com/api/1/partner_accounts'
